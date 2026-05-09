@@ -1,0 +1,20 @@
+{
+"timestamp": "20260507_171659",
+"model_file": "iot_model_20260507_171659.keras",
+"n_features": 28,
+"classes": [
+"BENIGN",
+"BRUTE_FORCE",
+"DDOS",
+"DOS",
+"MIRAI",
+"RECON",
+"SPOOFING",
+"WEB_ATTACK"
+],
+"window_size": 10,
+"batch_size": 256,
+"smote_enabled": true,
+"undersampling_rank": 2,
+"total_files_used": 14
+}
