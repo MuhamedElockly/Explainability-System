@@ -1,5 +1,7 @@
 """End-to-end IDS inference: blind feature windows → SHAP → Gemini → one PDF per attack incident."""
 
+import time
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -12,6 +14,7 @@ from nids_explain.config import (
     CSV_READ_NROWS,
     ENCODER_FILE,
     FEATURES_FILE,
+    GEMINI_INTER_REQUEST_DELAY_SEC,
     INCIDENT_REPORTS_DIR,
     MODEL_FILE,
     SCALAR_FILE,
@@ -67,6 +70,7 @@ def run_blind_incidents(le, trained_features, scaler, model, gemini_bundle, data
 
     INCIDENT_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     incident_seq = 0
+    llm_calls = 0
 
     for i in range(len(blind_windows)):
         probs = np.asarray(preds[i]).ravel()
@@ -98,7 +102,10 @@ def run_blind_incidents(le, trained_features, scaler, model, gemini_bundle, data
             "shap_meta": shap_meta,
             "row_start": int(row_starts[i]),
         }
+        if llm_calls > 0 and GEMINI_INTER_REQUEST_DELAY_SEC > 0:
+            time.sleep(GEMINI_INTER_REQUEST_DELAY_SEC)
         llm_text = generate_blind_incident_report(gemini_bundle, event, rag_context)
+        llm_calls += 1
 
         out_pdf = incident_pdf_path(INCIDENT_REPORTS_DIR, incident_seq, pred_name)
         meta_pdf = {

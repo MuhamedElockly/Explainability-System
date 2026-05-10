@@ -43,3 +43,9 @@ INCIDENT_REPORTS_DIR = _PROJECT_ROOT / os.environ.get("INCIDENT_REPORTS_DIR", "i
 # Legacy consolidated PDF filename (fix_assets CLEAN_REPORTS only)
 _LEGACY_REPORT = os.environ.get("REPORT_FILENAME", "ids_inference_report.pdf")
 LEGACY_REPORT_FILE = str(_PROJECT_ROOT / _LEGACY_REPORT)
+
+# Gemini API (rate limits / quota — see https://ai.google.dev/gemini-api/docs/rate-limits)
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
+GEMINI_INTER_REQUEST_DELAY_SEC = float(os.environ.get("GEMINI_INTER_REQUEST_DELAY_SEC", "4"))
+GEMINI_MAX_RETRIES = int(os.environ.get("GEMINI_MAX_RETRIES", "8"))
+# GEMINI_DISABLE=1 → skip LLM calls; PDFs still use SHAP + static RAG text (no retries).
