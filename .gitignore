@@ -19,7 +19,8 @@ ENV/
 # Generated reports (regenerate with test_model.py)
 incident_reports/*.pdf
 
-# Jupyter
+# Jupyter — notebooks can embed API keys; exclude by default (copy snippets into docs if needed)
+*.ipynb
 .ipynb_checkpoints/
 
 # Tools
