@@ -97,7 +97,7 @@ def _fallback_narrative(event: dict, rag_context: str, reason: str) -> str:
 
 def generate_blind_incident_report(gemini_bundle, event: dict, rag_context: str) -> str:
     """
-    Narrative for blind (unlabeled) windows: SHAP + probabilities + static attack-type reference (pseudo-RAG).
+    Narrative for blind (unlabeled) windows: SHAP + probabilities + vector-retrieved attack knowledge (RAG).
     Retries on 429 / quota with server-suggested or exponential backoff.
     """
     disable = os.environ.get("GEMINI_DISABLE", "").strip().lower()
@@ -113,7 +113,7 @@ def generate_blind_incident_report(gemini_bundle, event: dict, rag_context: str)
         "You are a SOC analyst writing a short incident explanation for operators.\n"
         "Inference used ONLY flow features; no dataset label was supplied to the model.\n\n"
         f"{rag_header()}\n\n"
-        "REFERENCE KNOWLEDGE (attack family background — use for terminology and typical patterns):\n"
+        "REFERENCE KNOWLEDGE (retrieved attack-family corpus chunks — cite themes, not chunk IDs verbatim):\n"
         f"{rag_context}\n\n"
         "MODEL OUTPUT:\n"
         f"- Predicted class: {event['predicted_class']}\n"

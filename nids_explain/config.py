@@ -37,6 +37,13 @@ BLIND_SAMPLE_COUNT = int(os.environ.get("BLIND_SAMPLE_COUNT", "8"))
 BLIND_BACKGROUND_WINDOWS = int(os.environ.get("BLIND_BACKGROUND_WINDOWS", "24"))
 CSV_READ_NROWS = int(os.environ.get("CSV_READ_NROWS", "800000"))
 
+# Stratified attack-only CSV sample (`export_attack_sample.py`). Not used automatically by pipeline.
+ATTACK_SAMPLE_DIR = _PROJECT_ROOT / "sample_datasets"
+DEFAULT_ATTACK_SAMPLE_CSV = ATTACK_SAMPLE_DIR / "attacks_sample.csv"
+ATTACK_SAMPLE_MAX_ROWS = int(os.environ.get("ATTACK_SAMPLE_MAX_ROWS", "6000"))
+ATTACK_SAMPLE_SCAN_NROWS = int(os.environ.get("ATTACK_SAMPLE_SCAN_NROWS", "500000"))
+ATTACK_SAMPLE_SEED = int(os.environ.get("ATTACK_SAMPLE_SEED", str(RNG_SEED)))
+
 # Per-incident PDFs (attack predictions only)
 INCIDENT_REPORTS_DIR = _PROJECT_ROOT / os.environ.get("INCIDENT_REPORTS_DIR", "incident_reports")
 
@@ -48,4 +55,13 @@ LEGACY_REPORT_FILE = str(_PROJECT_ROOT / _LEGACY_REPORT)
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
 GEMINI_INTER_REQUEST_DELAY_SEC = float(os.environ.get("GEMINI_INTER_REQUEST_DELAY_SEC", "4"))
 GEMINI_MAX_RETRIES = int(os.environ.get("GEMINI_MAX_RETRIES", "8"))
-# GEMINI_DISABLE=1 → skip LLM calls; PDFs still use SHAP + static RAG text (no retries).
+# GEMINI_DISABLE=1 → skip LLM calls; PDFs still use SHAP + retrieved RAG (or RAG_DISABLE static fallback).
+
+# Vector RAG (Chroma + sentence-transformers). Persisted under project root.
+RAG_PERSIST_DIR = _PROJECT_ROOT / os.environ.get("RAG_PERSIST_DIR", "rag_chroma").strip()
+RAG_EMBEDDING_MODEL = os.environ.get("RAG_EMBEDDING_MODEL", "all-MiniLM-L6-v2").strip()
+RAG_TOP_K = int(os.environ.get("RAG_TOP_K", "6"))
+RAG_TOP_K_FILTERED = int(os.environ.get("RAG_TOP_K_FILTERED", "4"))
+RAG_QUERY_TOP_SHAP = int(os.environ.get("RAG_QUERY_TOP_SHAP", "8"))
+RAG_PROMPT_MAX_CHARS = int(os.environ.get("RAG_PROMPT_MAX_CHARS", "12000"))
+RAG_PDF_CONTEXT_MAX_CHARS = int(os.environ.get("RAG_PDF_CONTEXT_MAX_CHARS", "4500"))

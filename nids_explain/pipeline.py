@@ -44,7 +44,7 @@ def _load_artifacts_and_model():
 def run_blind_incidents(le, trained_features, scaler, model, gemini_bundle, dataset_csv: str) -> None:
     """
     Random windows from CSV using feature columns only (label column never fed to the model).
-    For each attack prediction: SHAP + pseudo-RAG + Gemini + separate incident PDF.
+    For each attack prediction: SHAP + vector RAG retrieval + Gemini + separate incident PDF.
     """
     df_raw = pd.read_csv(dataset_csv, nrows=CSV_READ_NROWS)
     blind_windows, row_starts = sample_random_windows(
@@ -93,7 +93,6 @@ def run_blind_incidents(le, trained_features, scaler, model, gemini_bundle, data
             sample_index=i,
             top_k=TOP_SHAP_FEATURES,
         )
-        rag_context = get_attack_context(pred_name)
         event = {
             "predicted_class": pred_name,
             "confidence": confidence,
@@ -102,6 +101,7 @@ def run_blind_incidents(le, trained_features, scaler, model, gemini_bundle, data
             "shap_meta": shap_meta,
             "row_start": int(row_starts[i]),
         }
+        rag_context = get_attack_context(pred_name, event)
         if llm_calls > 0 and GEMINI_INTER_REQUEST_DELAY_SEC > 0:
             time.sleep(GEMINI_INTER_REQUEST_DELAY_SEC)
         llm_text = generate_blind_incident_report(gemini_bundle, event, rag_context)

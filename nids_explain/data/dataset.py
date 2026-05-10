@@ -11,7 +11,10 @@ def resolve_dataset_path():
     candidates = [env_path, DEFAULT_DATASET_REL]
     candidates.extend(
         [
-            "/mnt/f/courses/Master/Offinsive And Deffensife Cyper Security/Datasets & Models/unp-cic-iot-2023/wataiData/csv/CICIoT2023/part-00000-363d1ba3-8ab5-4f96-bc25-4d5862db7cb9-c000.csv",
+            "/mnt/f/courses/Master/Offinsive And Deffensife Cyper Security/Datasets & Models/"
+            "unp-cic-iot-2023/wataiData/csv/CICIoT2023/part-00000-363d1ba3-8ab5-4f96-bc25-4d5862db7cb9-c000.csv",
+            r"F:\courses\Master\Offinsive And Deffensife Cyper Security\Datasets & Models"
+            r"\unp-cic-iot-2023\wataiData\csv\CICIoT2023\part-00000-363d1ba3-8ab5-4f96-bc25-4d5862db7cb9-c000.csv",
             str(Path.cwd() / DEFAULT_DATASET_REL),
         ]
     )

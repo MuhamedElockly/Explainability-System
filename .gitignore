@@ -19,6 +19,12 @@ ENV/
 # Generated reports (regenerate with test_model.py)
 incident_reports/*.pdf
 
+# Generated attack-flow sample CSV (run export_attack_sample.py)
+sample_datasets/*.csv
+
+# Chroma vector store (rebuilt on first run from packaged corpus)
+rag_chroma/
+
 # Jupyter — notebooks can embed API keys; exclude by default (copy snippets into docs if needed)
 *.ipynb
 .ipynb_checkpoints/

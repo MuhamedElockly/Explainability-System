@@ -1,6 +1,8 @@
 # IDS Explainability System
 
-End-to-end pipeline for **network intrusion detection (IDS) explainability**: load a trained sequence model on flow features, run **blind inference** (no labels fed to the model), compute **Kernel SHAP** on the predicted class, enrich with **static attack-family text** (pseudo-RAG), optionally call **Google Gemini** for an operator-facing narrative, and write **one PDF per predicted attack incident**.
+**Technical deep dive:** [docs/RAG_SYSTEM.md](docs/RAG_SYSTEM.md) describes the vector **RAG** stack (Markdown chunking, embedding model `all-MiniLM-L6-v2`, Chroma, query expansion, Gemini integration).
+
+End-to-end pipeline for **network intrusion detection (IDS) explainability**: load a trained sequence model on flow features, run **blind inference** (no labels fed to the model), compute **Kernel SHAP** on the predicted class, enrich with **vector RAG** (Chroma + sentence-transformers over `nids_explain/llm/rag_corpus/`), optionally call **Google Gemini** for an operator-facing narrative, and write **one PDF per predicted attack incident**.
 
 ---
 
@@ -12,8 +14,8 @@ End-to-end pipeline for **network intrusion detection (IDS) explainability**: lo
 | **Inference** | Keras `.keras` model outputs per-class probabilities for each window. |
 | **Filtering** | Windows predicted as **BENIGN** skip report generation; **attack classes** trigger explainability. |
 | **SHAP** | Kernel SHAP explains the **softmax probability of the predicted class**, aggregating contributions over time steps per feature. |
-| **Pseudo-RAG** | `attack_kb.py` supplies short, class-specific reference text (replaceable later with real retrieval). |
-| **LLM** | Gemini turns SHAP + probabilities + reference text into plain-language narrative (with retries on rate limits; fallback if disabled or quota exhausted). |
+| **RAG** | `attack_kb.get_attack_context(class, event)` retrieves top‑k corpus chunks from a local **Chroma** store (`rag_chroma/`), query-expanded with top‑3 labels and SHAP feature names (`RAG_DISABLE=1` → short static fallback). |
+| **LLM** | Gemini turns SHAP + probabilities + retrieved RAG chunks into plain-language narrative (with retries on rate limits; fallback if disabled or quota exhausted). |
 | **Reporting** | Matplotlib builds a high-contrast **incident PDF** per attack prediction under `incident_reports/`. |
 
 ---
@@ -29,7 +31,7 @@ flowchart LR
   end
   subgraph explain [Explainability]
     Model --> SHAP[Kernel SHAP]
-    SHAP --> RAG[Attack KB text]
+    SHAP --> RAG[Chroma retrieval]
     RAG --> Gemini[Gemini narrative]
   end
   subgraph out [Output]
@@ -45,6 +47,7 @@ flowchart LR
 
 | Path | Role |
 |------|------|
+| `docs/RAG_SYSTEM.md` | Detailed RAG design (chunking, embeddings, Chroma retrieval, Gemini merge). |
 | `test_model.py` | Entry point; calls `nids_explain.pipeline.main`. |
 | `nids_explain/pipeline.py` | Orchestrates blind sampling → predict → SHAP → LLM → PDF. |
 | `nids_explain/config.py` | Paths, seeds, SHAP/Gemini tuning via environment variables. |
@@ -55,12 +58,16 @@ flowchart LR
 | `nids_explain/data/labels.py` | Label utilities (package consistency). |
 | `nids_explain/model/loader.py` | Loads `.keras` zip; patches Lambda layer config for deserialization. |
 | `nids_explain/explain/shap_attribution.py` | Kernel SHAP on predicted-class probability; top‑k features. |
-| `nids_explain/llm/attack_kb.py` | Static per-class attack descriptions + RAG-style headers. |
+| `nids_explain/llm/attack_kb.py` | RAG façade: retrieval + prompt header; optional static fallback. |
+| `nids_explain/llm/rag_engine.py` | Chroma ingest (auto on first run) + retrieval API. |
+| `nids_explain/llm/rag_corpus/*.md` | Attack-family corpus (Markdown `##` sections → chunks). |
 | `nids_explain/llm/gemini.py` | Gemini init (new `google.genai` or legacy `google.generativeai`), retries on 429, optional `GEMINI_DISABLE`, fallback narrative. |
 | `nids_explain/report/incident_pdf.py` | Single-incident PDF layout (verdict banner, SHAP table, reference block, LLM text). |
 | `nids_explain/utils/probability.py` | Top‑k class probability strings for reports. |
 | `model_artifacts/` | Trained model `.keras`, `label_encoder.joblib`, `scaler.joblib`, `feature_names.joblib`. |
 | `fix_assets.py` | Validates artifacts, clears Python caches, optionally deletes generated PDFs. |
+| `export_attack_sample.py` | Writes `sample_datasets/attacks_sample.csv` — stratified attack rows from the resolved CIC CSV (for smaller local experiments; set `DATASET_CSV` if needed). |
+| `sample_datasets/` | Holds generated `attacks_sample.csv` (gitignored; keep folder via `.gitkeep`). |
 
 ---
 
@@ -204,7 +211,8 @@ python fix_assets.py
 
 ## Extending the project
 
-- **Real RAG**: Replace `get_attack_context()` data source with retrieval over your corpus; keep the same function signature.
+- **Richer corpus**: Edit or add Markdown under `nids_explain/llm/rag_corpus/` (`##` headings define chunks); set `RAG_FORCE_REBUILD=1` once to re-embed into `rag_chroma/`.
+- **Attack-only CSV slice**: Run `python export_attack_sample.py` → `sample_datasets/attacks_sample.csv` (`ATTACK_SAMPLE_MAX_ROWS`, `ATTACK_SAMPLE_SCAN_NROWS`).
 - **Different LLM**: Add a sibling module to `gemini.py` and swap the call in `pipeline.py`.
 - **Batching**: Reduce `BLIND_SAMPLE_COUNT` or attack-only filtering to limit PDF and Gemini calls.
 
@@ -218,6 +226,7 @@ python fix_assets.py
 | Gemini `429` / quota | Wait for quota reset, enable billing, switch `GEMINI_MODEL`, reduce samples, or `GEMINI_DISABLE=1`. |
 | Model load errors | Run `fix_assets.py`; ensure `tf_setup` is imported before load (handled by `pipeline.py`). |
 | Empty incident PDFs folder | All sampled windows predicted BENIGN — increase `BLIND_SAMPLE_COUNT` or change `EXPLAIN_SEED`. |
+| RAG slow first run | Sentence-transformers downloads `RAG_EMBEDDING_MODEL` weights once; Chroma builds `rag_chroma/` on first retrieval. Use `RAG_DISABLE=1` to skip. |
 
 ---
 

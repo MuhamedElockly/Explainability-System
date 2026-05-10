@@ -11,6 +11,8 @@ import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import FancyBboxPatch
 
+from nids_explain.config import RAG_PDF_CONTEXT_MAX_CHARS
+
 
 def _safe_filename_token(name: str) -> str:
     s = re.sub(r"[^\w\-]+", "_", str(name).strip())
@@ -91,7 +93,7 @@ def write_incident_pdf(
         fig.text(0.08, 0.38, detail, ha="left", va="top", fontsize=11, color="#bae6fd")
 
         footer = (
-            "Interpretation combines model scores, SHAP attributions, reference knowledge (pseudo-RAG), "
+            "Interpretation combines model scores, SHAP attributions, retrieved reference knowledge (vector RAG), "
             "and optional LLM wording — validate operationally before blocking traffic."
         )
         fig.text(0.5, 0.06, textwrap.fill(footer, 78), ha="center", va="bottom", fontsize=10, color="#93c5fd")
@@ -142,11 +144,17 @@ def write_incident_pdf(
 
         fig = plt.figure(figsize=(8.27, 11.69))
         fig.patch.set_facecolor("white")
-        fig.suptitle("Reference knowledge (pseudo-RAG)", fontsize=20, weight="bold", color="#0c4a6e", y=0.96)
+        fig.suptitle("Reference knowledge (vector RAG)", fontsize=20, weight="bold", color="#0c4a6e", y=0.96)
+        rag_display = rag_context
+        if RAG_PDF_CONTEXT_MAX_CHARS > 0 and len(rag_display) > RAG_PDF_CONTEXT_MAX_CHARS:
+            rag_display = (
+                rag_display[: RAG_PDF_CONTEXT_MAX_CHARS].rstrip()
+                + "\n\n… (truncated for PDF layout; full text sent to LLM prompt.) …"
+            )
         fig.text(
             0.08,
             0.88,
-            textwrap.fill(rag_context, 86),
+            textwrap.fill(rag_display, 86),
             ha="left",
             va="top",
             fontsize=14,
@@ -155,9 +163,9 @@ def write_incident_pdf(
         )
         fig.text(
             0.08,
-            0.45,
-            "This static text can be replaced later with retrieved documents (vector RAG) "
-            "using the same prompt slot.",
+            0.42,
+            "Chunks are retrieved with Chroma embeddings from nids_explain/llm/rag_corpus/ "
+            "(set RAG_DISABLE=1 for a short static fallback).",
             ha="left",
             va="top",
             fontsize=12,

@@ -1,60 +1,104 @@
 """
-Static attack-type reference text for LLM prompts (pseudo-RAG).
+Attack-type knowledge for LLM grounding: Chroma vector RAG over packaged corpus.
 
-Swap this module later for vector DB / retrieval without changing the rest of the pipeline.
+Set RAG_DISABLE=1 to fall back to compact static paragraphs (no embedding load).
+RAG_FORCE_REBUILD=1 wipes the local Chroma store and re-ingests markdown corpus.
 """
 
-# Short operational descriptions per coarse class (IDS context).
-ATTACK_KNOWLEDGE: dict[str, str] = {
+from __future__ import annotations
+
+import os
+from typing import Any
+
+from nids_explain.config import RAG_PROMPT_MAX_CHARS
+
+# Fallback when RAG is disabled or ingestion/embedding fails (keeps pipeline usable offline).
+_STATIC_ATTACK_KNOWLEDGE: dict[str, str] = {
     "BENIGN": (
-        "Benign traffic: normal user or device behavior without attack signatures. "
-        "Typical flows show stable rates, expected protocols, and no coordinated anomalies."
+        "Benign traffic: normal device or user sessions without attack semantics. "
+        "Expect protocol mixes that match asset roles and baselines."
     ),
     "BRUTE_FORCE": (
-        "Brute-force attacks: many authentication attempts (e.g., SSH, HTTP login, Telnet) "
-        "often from one or few sources. Indicators can include high connection churn, repeated failures, "
-        "and protocol-specific burst patterns vs. baseline."
+        "Brute-force attempts: repeated authentication trials toward services; "
+        "often many short sessions or churn vs baseline."
     ),
     "DDOS": (
-        "Distributed denial-of-service: high-volume, multi-source flooding aimed at exhausting bandwidth, "
-        "state tables, or application resources. Often shows abnormal packet rates, many flows, and skewed "
-        "feature distributions vs. normal traffic."
+        "Distributed denial-of-service: many sources flooding targets to exhaust "
+        "bandwidth, state, or CPU; often high fan-in and volumetric anomalies."
     ),
     "DOS": (
-        "Denial-of-service (single-source or localized flood): sustained abusive traffic toward a target "
-        "to degrade availability; may resemble DDoS but with fewer apparent sources."
+        "Denial-of-service from concentrated sources: sustained abusive volume "
+        "targeting availability with narrower apparent fan-in than DDoS."
     ),
     "MIRAI": (
-        "Mirai-class IoT botnet activity: malware-driven scanning, credential stuffing, and coordinated floods "
-        "often involving IoT protocols and characteristic scanning/flood signatures."
+        "Mirai-class IoT botnet motifs: scanning, default-credential abuse, "
+        "and coordinated flood participation from embedded devices."
     ),
     "RECON": (
-        "Reconnaissance: probing and mapping (e.g., port scans, ping sweeps, OS fingerprinting) preceding exploitation. "
-        "Often lower volume than floods but with distinctive scan patterns."
+        "Reconnaissance: mapping activity such as sweeps and probes preceding exploitation; "
+        "often many short flows to diverse destinations/ports."
     ),
     "SPOOFING": (
-        "Spoofing / MITM-style manipulation: forged identities or redirection (e.g., ARP/DNS abuse). "
-        "May show inconsistencies in addressing or protocol anomalies tied to impersonation."
+        "Spoofing / path-identity manipulation motifs: forged or inconsistent addressing roles; "
+        "interpretation depends on which L3/L7 signals the model encodes."
     ),
     "WEB_ATTACK": (
-        "Web-layer attacks: injections, XSS, malicious uploads, or web exploitation attempts. "
-        "Often correlated with abnormal HTTP/TLS feature statistics vs. benign browsing."
+        "Web-layer intrusion attempts: injections, malicious uploads, exploitation-shaped HTTP(S) "
+        "dialogs when visible in flow aggregates."
     ),
 }
 
 
-def get_attack_context(predicted_class: str) -> str:
-    """Return reference paragraph for the predicted label (RAG-style context)."""
-    if not predicted_class:
-        return ATTACK_KNOWLEDGE["BENIGN"]
-    name = str(predicted_class).strip()
-    if name in ATTACK_KNOWLEDGE:
-        return ATTACK_KNOWLEDGE[name]
-    return ATTACK_KNOWLEDGE.get(name.upper(), ATTACK_KNOWLEDGE["BENIGN"])
+def _canonical_class(name: str | None) -> str:
+    if not name:
+        return "BENIGN"
+    key = str(name).strip().upper()
+    return key if key in _STATIC_ATTACK_KNOWLEDGE else key
+
+
+def static_attack_paragraph(predicted_class: str | None) -> str:
+    """One short paragraph (no vector DB) — used when RAG is off or errors."""
+    canon = _canonical_class(predicted_class)
+    return _STATIC_ATTACK_KNOWLEDGE.get(canon, _STATIC_ATTACK_KNOWLEDGE["BENIGN"])
 
 
 def rag_header() -> str:
     return (
-        "The following REFERENCE KNOWLEDGE describes typical behavior of the predicted attack family. "
-        "Use it to clarify terminology and expected indicators; tie conclusions to SHAP features and probabilities."
+        "The following REFERENCE KNOWLEDGE chunks were retrieved from a local vector database "
+        "(embeddings over an attack-family corpus). "
+        "Use them for terminology and typical patterns; prioritize agreement with SHAP feature names "
+        "and model probabilities. "
+        "Do not invent packet-level details or attributions not supported by SHAP or the cited chunks. "
+        "If chunks conflict with the window, prefer conservative wording."
     )
+
+
+def get_attack_context(predicted_class: str, event: dict[str, Any] | None = None) -> str:
+    """
+    Retrieve top-k corpus chunks for `predicted_class`, optionally query-expanded with
+    `event` (top-3 string + SHAP feature names), format for the LLM prompt slot.
+    """
+    off = os.environ.get("RAG_DISABLE", "").strip().lower() in ("1", "true", "yes")
+    if off:
+        return static_attack_paragraph(predicted_class)
+
+    try:
+        from nids_explain.llm import rag_engine
+
+        chunks = rag_engine.retrieve_for_incident(predicted_class, event)
+        text = rag_engine.format_chunks_for_prompt(chunks)
+        if RAG_PROMPT_MAX_CHARS > 0 and len(text) > RAG_PROMPT_MAX_CHARS:
+            text = (
+                text[: RAG_PROMPT_MAX_CHARS].rstrip()
+                + "\n\n[Retrieved context truncated to RAG_PROMPT_MAX_CHARS for prompt budget.]"
+            )
+        return text
+    except Exception:
+        return static_attack_paragraph(predicted_class)
+
+
+def format_rag_footer_note() -> str:
+    """Optional status line for logs or PDF footers."""
+    if os.environ.get("RAG_DISABLE", "").strip().lower() in ("1", "true", "yes"):
+        return "Reference knowledge: static fallback (RAG_DISABLE)."
+    return "Reference knowledge: vector retrieval (Chroma)."
