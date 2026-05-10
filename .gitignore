@@ -1,0 +1,32 @@
+# Secrets — never commit API keys
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Local conda copy (should not live in repo)
+.conda/
+
+# Generated reports (regenerate with test_model.py)
+incident_reports/*.pdf
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Tools
+.pytest_cache/
+.mypy_cache/
+*.log
+
+# OS
+.Desktop.ini
+Thumbs.db

@@ -1,0 +1,14 @@
+# IDS Explainability System — Python dependencies
+# Install: pip install -r requirements.txt
+
+numpy>=1.23
+pandas>=2.0
+joblib>=1.3
+tensorflow>=2.15
+keras>=3.0
+shap>=0.44
+matplotlib>=3.8
+
+# Gemini (either SDK works; gemini.py tries google.genai first, then google.generativeai)
+google-genai>=1.0
+google-generativeai>=0.8
